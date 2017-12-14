@@ -835,6 +835,25 @@ class PostTest < ActiveSupport::TestCase
           end
         end
 
+        context "for a favgroup" do
+          setup do
+            @favgroup = FactoryGirl.create(:favorite_group, creator: @user)
+            @post = FactoryGirl.create(:post, :tag_string => "aaa favgroup:#{@favgroup.id}")
+          end
+
+          should "add the post to the favgroup" do
+            assert_equal(1, @favgroup.reload.post_count)
+            assert_equal(true, !!@favgroup.contains?(@post.id))
+          end
+
+          should "remove the post from the favgroup" do
+            @post.update(:tag_string => "-favgroup:#{@favgroup.id}")
+
+            assert_equal(0, @favgroup.reload.post_count)
+            assert_equal(false, !!@favgroup.contains?(@post.id))
+          end
+        end
+
         context "for a pool" do
           setup do
             mock_pool_archive_service!
@@ -1566,6 +1585,42 @@ class PostTest < ActiveSupport::TestCase
 
           @post.source = "http://pictures.hentai-foundry.com/a/AnimeFlux/219123/Mobile-Suit-Equestria-rainbow-run.jpg"
           assert_equal("http://www.hentai-foundry.com/pictures/user/AnimeFlux/219123", @post.normalized_source)
+        end
+      end
+
+      context "when validating tags" do
+        should "warn when creating a new general tag" do
+          @post.add_tag("tag")
+          @post.save
+
+          assert_match(/Created 1 new tag: \[\[tag\]\]/, @post.warnings.full_messages.join)
+        end
+
+        should "warn when adding an artist tag without an artist entry" do
+          @post.add_tag("artist:bkub")
+          @post.save
+
+          assert_match(/Artist \[\[bkub\]\] requires an artist entry./, @post.warnings.full_messages.join)
+        end
+
+        should "warn when a tag removal failed due to implications or automatic tags" do
+          ti = FactoryGirl.create(:tag_implication, antecedent_name: "cat", consequent_name: "animal")
+          @post.reload
+          @post.update(old_tag_string: @post.tag_string, tag_string: "chen_(cosplay) chen cosplay cat animal")
+          @post.reload
+          @post.update(old_tag_string: @post.tag_string, tag_string: "chen_(cosplay) chen cosplay cat -cosplay")
+
+          assert_match(/\[\[animal\]\] and \[\[cosplay\]\] could not be removed./, @post.warnings.full_messages.join)
+        end
+
+        should "warn when a post from a known source is missing an artist tag" do
+          post = FactoryGirl.build(:post, source: "https://www.pixiv.net/member_illust.php?mode=medium&illust_id=65985331")
+          post.save
+          assert_match(/Artist tag is required/, post.warnings.full_messages.join)
+        end
+
+        should "warn when missing a copyright tag" do
+          assert_match(/Copyright tag is required/, @post.warnings.full_messages.join)
         end
       end
     end
