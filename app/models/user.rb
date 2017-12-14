@@ -622,7 +622,9 @@ class User < ApplicationRecord
     end
 
     def favorite_group_limit
-      if is_platinum?
+      if is_admin?
+        100
+      elsif is_platinum?
         10
       elsif is_gold?
         5
@@ -633,7 +635,9 @@ class User < ApplicationRecord
 
     def api_regen_multiplier
       # regen this amount per second
-      if is_platinum?
+      if is_admin?
+        100
+      elsif is_platinum?
         4
       elsif is_gold?
         2
@@ -645,7 +649,9 @@ class User < ApplicationRecord
     def api_burst_limit
       # can make this many api calls at once before being bound by
       # api_regen_multiplier refilling your pool
-      if is_platinum?
+      if is_admin?
+        1_000
+      elsif is_platinum?
         60
       elsif is_gold?
         30
