@@ -275,7 +275,7 @@ class Tag < ApplicationRecord
       when :float
         object.to_f
 
-      when :date
+      when :date, :datetime
         begin
           Time.zone.parse(object)
         rescue Exception
@@ -609,22 +609,52 @@ class Tag < ApplicationRecord
 
           when "-favgroup"
             favgroup_id = FavoriteGroup.name_to_id(g2)
+            favgroup = FavoriteGroup.find(favgroup_id)
+
+            if !favgroup.viewable_by?(CurrentUser.user)
+              raise User::PrivilegeError.new
+            end
+
             q[:favgroups_neg] ||= []
             q[:favgroups_neg] << favgroup_id
 
           when "favgroup"
             favgroup_id = FavoriteGroup.name_to_id(g2)
+            favgroup = FavoriteGroup.find(favgroup_id)
+
+            if !favgroup.viewable_by?(CurrentUser.user)
+              raise User::PrivilegeError.new
+            end
+
             q[:favgroups] ||= []
             q[:favgroups] << favgroup_id
 
           when "-fav"
+            favuser = User.find_by_name(g2)
+
+            if favuser.hide_favorites?
+              raise User::PrivilegeError.new
+            end
+
             q[:tags][:exclude] << "fav:#{User.name_to_id(g2)}"
 
           when "fav"
+            favuser = User.find_by_name(g2)
+
+            if favuser.hide_favorites?
+              raise User::PrivilegeError.new
+            end
+
             q[:tags][:related] << "fav:#{User.name_to_id(g2)}"
 
           when "ordfav"
             user_id = User.name_to_id(g2)
+            favuser = User.find(user_id)
+
+            if favuser.hide_favorites?
+              raise User::PrivilegeError.new
+            end
+
             q[:tags][:related] << "fav:#{user_id}"
             q[:ordfav] = user_id
 
@@ -838,7 +868,7 @@ class Tag < ApplicationRecord
     end
 
     def search(params)
-      q = where("true")
+      q = super
       params = {} if params.blank?
 
       if params[:fuzzy_name_matches].present?
