@@ -3,17 +3,18 @@ require 'test_helper'
 class DmailTest < ActiveSupport::TestCase
   context "A dmail" do
     setup do
-      User.any_instance.stubs(:validate_sock_puppets).returns(true)
       @user = FactoryGirl.create(:user)
       CurrentUser.user = @user
       CurrentUser.ip_addr = "1.2.3.4"
       ActionMailer::Base.delivery_method = :test
       ActionMailer::Base.perform_deliveries = true
       ActionMailer::Base.deliveries = []
+      TestAfterCommit.enabled = true
     end
 
     teardown do
       CurrentUser.user = nil
+      TestAfterCommit.enabled = false
     end
 
     context "spam" do

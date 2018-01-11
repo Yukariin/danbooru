@@ -217,6 +217,14 @@ module Danbooru
       "albert"
     end
 
+    def build_file_url(post)
+      "/data/#{post.file_path_prefix}/#{post.md5}.#{post.file_ext}"
+    end
+
+    def build_large_file_url(post)
+      "/data/#{post.file_path_prefix}#{Danbooru.config.large_image_prefix}/#{post.md5}.#{post.large_file_ext}"
+    end
+
 #TAG CONFIGURATION
 
     #Full tag configuration info for all tags
@@ -456,7 +464,7 @@ module Danbooru
 
     # Should return true if the given tag should be suggested for removal in the post replacement dialog box.
     def remove_tag_after_replacement?(tag)
-      tag =~ /replaceme|.*_sample|resized|upscaled|downscaled|md5_mismatch|jpeg_artifacts/i
+      tag =~ /replaceme|.*_sample|resized|upscaled|downscaled|md5_mismatch|jpeg_artifacts|corrupted_image/i
     end
 
     def shared_dir_path
@@ -503,6 +511,10 @@ module Danbooru
     # impose additional requirements to create tag aliases and implications
     def strict_tag_requirements
       true
+    end
+
+    def image_magick_srgb_profile_path
+      # "/usr/share/ghostscript/9.06/Resource/ColorSpace/sRGB"
     end
 
     # For downloads, if the host matches any of these IPs, block it
@@ -557,6 +569,11 @@ module Danbooru
     # enable some (donmai-specific) optimizations for post counts
     def estimate_post_counts
       false
+    end
+
+    # disable this for tests
+    def enable_sock_puppet_validation?
+      true
     end
 
     # reportbooru options - see https://github.com/r888888888/reportbooru
@@ -660,6 +677,16 @@ module Danbooru
     end
 
     def rakismet_url
+    end
+
+    # Cloudflare data
+    def cloudflare_email
+    end
+
+    def cloudflare_zone
+    end
+
+    def cloudflare_key
     end
   end
 

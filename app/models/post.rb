@@ -145,29 +145,16 @@ class Post < ApplicationRecord
     end
 
     def file_url
-       if Danbooru.config.use_s3_proxy?(self)
-         "/cached/data/#{seo_tag_string}#{file_path_prefix}#{md5}.#{file_ext}"
-       else
-         "/data/#{seo_tag_string}#{file_path_prefix}#{md5}.#{file_ext}"
-       end
+      Danbooru.config.build_file_url(self)
     end
 
     # this is for the 640x320 version
     def cropped_file_url
-      if Danbooru.config.use_s3_proxy?(self)
-        "/cached/data/cropped/large/#{md5}.jpg"
-      else
-        "/data/cropped/large/#{md5}.jpg"
-      end
     end
 
     def large_file_url
       if has_large?
-        if Danbooru.config.use_s3_proxy?(self)
-          "/cached/data/sample/#{seo_tag_string}#{file_path_prefix}#{Danbooru.config.large_image_prefix}#{md5}.#{large_file_ext}"
-        else
-          "/data/sample/#{seo_tag_string}#{file_path_prefix}#{Danbooru.config.large_image_prefix}#{md5}.#{large_file_ext}"
-        end
+        Danbooru.config.build_large_file_url(self)
       else
         file_url
       end
@@ -190,11 +177,7 @@ class Post < ApplicationRecord
         return "/images/download-preview.png"
       end
 
-      # if has_cropped? && !CurrentUser.disable_cropped_thumbnails?
-      #   "/cached/data/cropped/small/#{md5}.jpg"
-      # else
-        "/data/preview/#{file_path_prefix}#{md5}.jpg"
-      # end
+      "/data/preview/#{file_path_prefix}#{md5}.jpg"
     end
 
     def complete_preview_file_url
@@ -204,9 +187,17 @@ class Post < ApplicationRecord
     def open_graph_image_url
       if is_image?
         if has_large?
-          "http://#{Danbooru.config.hostname}#{large_file_url}"
+          if Danbooru.config.build_large_file_url(self) =~ /http/
+            large_file_url
+          else
+            "http://#{Danbooru.config.hostname}#{large_file_url}"
+          end
         else
-          "http://#{Danbooru.config.hostname}#{file_url}"
+          if Danbooru.config.build_file_url(self) =~ /http/
+            file_url
+          else
+            "http://#{Danbooru.config.hostname}#{file_url}"
+          end
         end
       else
         complete_preview_file_url
@@ -1646,11 +1637,14 @@ class Post < ApplicationRecord
       where("uploader_id = ?", user_id)
     end
 
-    def available_for_moderation(hidden)
+    def available_for_moderation(hidden, user = CurrentUser.user)
+      approved_posts = user.post_approvals.select(:post_id)
+      disapproved_posts = user.post_disapprovals.select(:post_id)
+
       if hidden.present?
-        where("posts.id IN (SELECT pd.post_id FROM post_disapprovals pd WHERE pd.user_id = ?)", CurrentUser.id)
+        where("posts.uploader_id = ? OR posts.id IN (#{approved_posts.to_sql}) OR posts.id IN (#{disapproved_posts.to_sql})", user.id)
       else
-        where("posts.id NOT IN (SELECT pd.post_id FROM post_disapprovals pd WHERE pd.user_id = ?)", CurrentUser.id)
+        where.not(uploader: user).where.not(id: approved_posts).where.not(id: disapproved_posts)
       end
     end
 
